@@ -21,6 +21,10 @@ _GLOBAL_SEED = 0
 logger = getLogger()
 
 
+def init_IF_data():
+    pass
+
+
 def init_data(
     transform,
     batch_size,
