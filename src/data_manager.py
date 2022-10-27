@@ -17,12 +17,65 @@ import torch
 import torchvision.transforms as transforms
 import torchvision
 
+import utils
+from tifffile import imread
+import numpy
+
 _GLOBAL_SEED = 0
 logger = getLogger()
 
 
-def init_IF_data():
-    pass
+def init_IF_data(
+    transform,
+    batch_size,
+    pin_mem=True,
+    num_workers=8,
+    world_size=1,
+    rank=0,
+    root_path=None,
+    image_folder=None,
+    training=True,
+    copy_data=False,
+    drop_last=True,
+    subset_file=None
+):
+    dataset = ReturnIndexDataset(os.path.join(root_path))
+    dist_sampler = torch.utils.data.distributed.DistributedSampler(
+        dataset=dataset,
+        num_replicas=world_size,
+        rank=rank)
+    data_loader = torch.utils.data.DataLoader(
+        dataset,
+        sampler=dist_sampler,
+        batch_size=batch_size,
+        drop_last=drop_last,
+        pin_memory=pin_mem,
+        num_workers=num_workers)
+    logger.info('ImageNet unsupervised data loader created')
+    return (data_loader, dist_sampler)
+
+
+
+#Specifically to process .TIFF images
+class ReturnIndexDataset(datasets.ImageFolder):
+    def __getitem__(self, idx):
+        path, target = self.samples[idx]
+        image= imread(path)
+        image=image.astype(float)
+        image = image[:,:,2,2,2]
+        image = utils.normalize_numpy_0_to_1(image)
+        image = numpy.swapaxes(image,0,2)
+        image = torch.from_numpy(image)
+        transform = torchvision.transforms.Normalize((0.485, 0.456, 0.406),(0.229, 0.224, 0.225))
+        image= transform(image)
+        #image = image[None, :]
+        transform = transforms.Resize(256)
+        image = transform(image)
+        #image = image[0]
+        center_crop = transforms.CenterCrop(224)
+        image = center_crop(image)
+        return image, idx
+
 
 
 def init_data(

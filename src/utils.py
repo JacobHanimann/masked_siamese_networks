@@ -292,3 +292,9 @@ def grad_logger(named_params):
     if stats.first_layer is None or stats.last_layer is None:
         stats.first_layer = stats.last_layer = 0.
     return stats
+
+def normalize_numpy_0_to_1(x):
+    x_min = x.min(axis=(0,1), keepdims=True)
+    x_max = x.max(axis=(0,1), keepdims=True)
+    x = (x - x_min)/(x_max-x_min)
+    return x
