@@ -17,7 +17,7 @@ import cyanure as cyan
 
 import src.deit as deit
 from src.data_manager import (
-    init_data,
+    init_IF_data
 )
 
 logging.basicConfig()
@@ -119,27 +119,15 @@ def main(
     # -- Function to make train/test dataloader
     def init_pipe(training):
         # -- make data transforms
-        transform = transforms.Compose([
-            transforms.Resize(size=256),
-            transforms.CenterCrop(size=224),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                (0.485, 0.456, 0.406),
-                (0.229, 0.224, 0.225))])
         # -- init data-loaders/samplers
         subset_file = subset_path if training else None
-        data_loader, _ = init_data(
-            transform=transform,
+        data_loader, _ = init_IF_data(
             batch_size=16,
             num_workers=0,
             world_size=1,
             rank=0,
             root_path=root_path,
-            image_folder=image_folder,
-            training=training,
-            copy_data=False,
-            drop_last=False,
-            subset_file=subset_file)
+            drop_last=False)
         return data_loader
 
     # -- Initialize the model
@@ -210,6 +198,9 @@ def main(
             'labs': test_labs
         }, test_embs_path)
         logger.info(f'saved test embs of shape {test_embs.shape}')
+
+    #plot embeddings 
+
     # -- Normalize embeddings
     cyan.preprocess(test_embs, normalize=normalize, columns=False, centering=True)
 

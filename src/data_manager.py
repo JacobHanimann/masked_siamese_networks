@@ -17,27 +17,23 @@ import torch
 import torchvision.transforms as transforms
 import torchvision
 
-import utils
+import src.utils as utils
 from tifffile import imread
 import numpy
+from torchvision import datasets
 
 _GLOBAL_SEED = 0
 logger = getLogger()
 
 
 def init_IF_data(
-    transform,
     batch_size,
     pin_mem=True,
     num_workers=8,
     world_size=1,
     rank=0,
     root_path=None,
-    image_folder=None,
-    training=True,
-    copy_data=False,
     drop_last=True,
-    subset_file=None
 ):
     dataset = ReturnIndexDataset(os.path.join(root_path))
     dist_sampler = torch.utils.data.distributed.DistributedSampler(
@@ -51,7 +47,7 @@ def init_IF_data(
         drop_last=drop_last,
         pin_memory=pin_mem,
         num_workers=num_workers)
-    logger.info('ImageNet unsupervised data loader created')
+    logger.info('Data loader created')
     return (data_loader, dist_sampler)
 
 
@@ -62,7 +58,7 @@ class ReturnIndexDataset(datasets.ImageFolder):
         path, target = self.samples[idx]
         image= imread(path)
         image=image.astype(float)
-        image = image[:,:,2,2,2]
+        image = image[:,:,[2,2,2]]
         image = utils.normalize_numpy_0_to_1(image)
         image = numpy.swapaxes(image,0,2)
         image = torch.from_numpy(image)
@@ -73,9 +69,8 @@ class ReturnIndexDataset(datasets.ImageFolder):
         image = transform(image)
         #image = image[0]
         center_crop = transforms.CenterCrop(224)
-        image = center_crop(image)
+        image = center_crop(image).float()
         return image, idx
-
 
 
 def init_data(
