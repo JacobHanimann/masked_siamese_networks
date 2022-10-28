@@ -21,6 +21,7 @@ import src.utils as utils
 from tifffile import imread
 import numpy
 from torchvision import datasets
+from catalyst.data import DistributedSamplerWrapper
 
 _GLOBAL_SEED = 0
 logger = getLogger()
@@ -50,6 +51,55 @@ def init_IF_data(
     logger.info('Data loader created')
     return (data_loader, dist_sampler)
 
+
+def init_train_test_dataloaders(
+    dataset,
+    batch_size,
+    pin_mem=True,
+    num_workers=8,
+    world_size=1,
+    rank=0,
+    root_path=None,
+    drop_last=True,
+):  
+    #FIRST SPLIT THE DATASET INTO TRAIN AND VALIDATION WITH SAME SEED AS IN TRAINING
+    validation_split = 0.2
+    shuffle_dataset = True
+    random_seed= 42
+    # Creating data indices for training and validation splits:
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    split = int(numpy.floor(validation_split * dataset_size))
+    if shuffle_dataset :
+        numpy.random.seed(random_seed)
+        numpy.random.shuffle(indices)
+    train_indices, val_indices = indices[split:], indices[:split]
+
+     # Creating PT data samplers and loaders:
+    train_sampler = torch.utils.data.SubsetRandomSampler(train_indices)
+    # train_sampler_wrapped = DistributedSamplerWrapper(train_sampler)
+    val_sampler = torch.utils.data.SubsetRandomSampler(val_indices)
+    # val_sampler_wrapped = DistributedSamplerWrapper(val_sampler)
+
+    data_loader_train = torch.utils.data.DataLoader(
+        dataset,
+        sampler=train_sampler,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=pin_mem,
+        drop_last=drop_last,
+    )
+    data_loader_val = torch.utils.data.DataLoader(
+        dataset,
+        sampler=val_sampler,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=pin_mem,
+        drop_last=drop_last,
+    )
+    print(f"Data loaded with {len(train_sampler)} train and {len(val_sampler)} val imgs.")
+    logger.info('Data loader created')
+    return (data_loader_train, data_loader_val, train_sampler, val_sampler)
 
 
 #Specifically to process .TIFF images
